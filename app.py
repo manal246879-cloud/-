@@ -18,8 +18,8 @@ custom_css = """
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# --- إعدادات API الحقيقية ---
-# تم وضع مفتاحك الخاص هنا ليعمل مباشرة
+# --- إعدادات API ---
+# تم استخدام مفتاحك الذي زودتيني به لضمان عمل الفزعة
 API_KEY = "AIzaSyCXOdsAR9FTn649dMtObx2ui8e73bF81-k"
 genai.configure(api_key=API_KEY)
 
@@ -30,7 +30,6 @@ st.subheader("من تعقيد أكاديمي… إلى جلسة سوالف")
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
 if uploaded_file is not None:
-    # 1. استخراج النص الفعلي من ملف الـ PDF
     reader = PdfReader(uploaded_file)
     full_text = ""
     for page in reader.pages:
@@ -46,22 +45,21 @@ if uploaded_file is not None:
 
     with col1:
         if st.button("🇸🇦 سولفها بالعربي"):
-            prompt = f"أنت فزعة، مساعدة أكاديمية سعودية. حولي هذا النص الأكاديمي إلى شرح مفصل وعميق بلهجة نجدية بيضاء (سوالف)، بأسلوب داعم وأنثوي. لا تلخصي، اشرحي كل التفاصيل. حافظي على المصطلحات العلمية كما هي. النص: {full_text}"
+            prompt = f"أنتِ فزعة، اشرحي هذا النص بلهجة نجدية بيضاء (سوالف) وبشكل مفصل: {full_text}"
             lang_code = 'ar'
     with col2:
         if st.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            prompt = f"أنت فزعة. ترجمي النص التالي للعربي واشرحيه بلهجة نجدية سوالف. حافظي على المصطلحات الإنجليزية المهمة كما هي بين القوسين. اشرحي بعمق ولا تلخصي. النص: {full_text}"
+            prompt = f"ترجمي واشرحي هذا النص الإنجليزي بلهجة نجدية سوالف: {full_text}"
             lang_code = 'ar'
     with col3:
         if st.button("🇬🇧 English to English"):
-            prompt = f"Transform this academic text into a deep-dive conversational English explanation. Keep it friendly but intellectually rich. Do not summarize. Original text: {full_text}"
+            prompt = f"Simplify this academic text into conversational English: {full_text}"
             lang_code = 'en'
 
-    # --- معالجة الذكاء الاصطناعي وتوليد الصوت الحقيقي ---
     if prompt:
-        with st.spinner("جاري تحويل المحتوى إلى سوالف ممتعة وتوليد الصوت... ✨"):
+        with st.spinner("جاري تحويل المحتوى إلى سوالف وتوليد الصوت... ✨"):
             try:
-                # طلب الشرح من Gemini باستخدام المودل الصحيح
+                # تصحيح استدعاء المودل ليكون متوافقاً
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content(prompt)
                 result_text = response.text
@@ -70,26 +68,13 @@ if uploaded_file is not None:
                 st.markdown("### 📖 الشرح المولد")
                 st.write(result_text)
 
-                # --- تحويل النص إلى صوت فعلي (TTS) ---
-                # نستخدم gTTS لتحويل الكلام المولد إلى صوت
+                # توليد الصوت الحقيقي
                 tts = gTTS(text=result_text, lang=lang_code)
-                audio_file = "faza_voice.mp3"
-                tts.save(audio_file)
-                
-                # عرض مشغل الصوت
-                st.audio(audio_file)
-
-                # أزرار التحميل
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.download_button("📄 تحميل الشرح (نص)", result_text, file_name="faza_text.txt")
-                with c2:
-                    with open(audio_file, "rb") as f:
-                        st.download_button("🎵 تحميل السوالف (صوت MP3)", f, file_name="faza_audio.mp3")
+                audio_path = "faza_voice.mp3"
+                tts.save(audio_path)
+                st.audio(audio_path)
 
             except Exception as e:
-                st.error(f"حدث خطأ أثناء المعالجة: {e}")
-                st.info("تأكدي من تحديث مكتبة google-generativeai عبر الأمر: pip install -U google-generativeai")
-
+                st.error(f"حدث خطأ: {e}")
 else:
     st.info("بانتظار ملفك الأكاديمي لنبدأ السوالف..")
