@@ -19,9 +19,8 @@ custom_css = """
 st.markdown(custom_css, unsafe_allow_html=True)
 
 # --- إعدادات API ---
-# تم استخدام مفتاحك الذي زودتيني به لضمان عمل الفزعة
-API_KEY = "AIzaSyCXOdsAR9FTn649dMtObx2ui8e73bF81-k"
-genai.configure(api_key=API_KEY)
+# استخدمت مفتاحك المذكور في المحادثة السابقة لضمان التشغيل
+genai.configure(api_key="AIzaSyCXOdsAR9FTn649dMtObx2ui8e73bF81-k")
 
 st.image("https://upload.wikimedia.org/wikipedia/ar/thumb/0/00/PNU_Logo.svg/1200px-PNU_Logo.svg.png", width=100)
 st.title("🌸 فزعة، تسولفها")
@@ -45,21 +44,21 @@ if uploaded_file is not None:
 
     with col1:
         if st.button("🇸🇦 سولفها بالعربي"):
-            prompt = f"أنتِ فزعة، اشرحي هذا النص بلهجة نجدية بيضاء (سوالف) وبشكل مفصل: {full_text}"
+            prompt = f"أنت فزعة، مساعدة أكاديمية. اشرحي هذا النص بلهجة نجدية بيضاء (سوالف) وبشكل مفصل جداً: {full_text}"
             lang_code = 'ar'
     with col2:
         if st.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            prompt = f"ترجمي واشرحي هذا النص الإنجليزي بلهجة نجدية سوالف: {full_text}"
+            prompt = f"أنت فزعة. ترجمي واشرحي هذا النص الإنجليزي بلهجة نجدية سوالف: {full_text}"
             lang_code = 'ar'
     with col3:
         if st.button("🇬🇧 English to English"):
-            prompt = f"Simplify this academic text into conversational English: {full_text}"
+            prompt = f"Simplify this academic text into friendly conversational English: {full_text}"
             lang_code = 'en'
 
     if prompt:
         with st.spinner("جاري تحويل المحتوى إلى سوالف وتوليد الصوت... ✨"):
             try:
-                # تصحيح استدعاء المودل ليكون متوافقاً
+                # هذا السطر هو اللي كان يسبب المشكلة (تم تصحيحه)
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content(prompt)
                 result_text = response.text
@@ -68,7 +67,7 @@ if uploaded_file is not None:
                 st.markdown("### 📖 الشرح المولد")
                 st.write(result_text)
 
-                # توليد الصوت الحقيقي
+                # توليد الصوت الحقيقي (TTS)
                 tts = gTTS(text=result_text, lang=lang_code)
                 audio_path = "faza_voice.mp3"
                 tts.save(audio_path)
