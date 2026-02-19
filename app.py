@@ -3,18 +3,12 @@ import google.generativeai as genai
 from pypdf import PdfReader
 from gtts import gTTS
 import os
-import tempfile
 
-# إعدادات الصفحة
+# --- إعدادات جامعة نورة ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
 
-# جلب المفتاح بأمان
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-except Exception:
-    st.warning("⚠️ يرجى إضافة GEMINI_API_KEY في إعدادات Secrets.")
-    st.stop()
+# --- الـ API Key الخاص بك (ضعيه بين الكوتشين) ---
+genai.configure(api_key="AIzaSyAg5uwFJdtDZ4GXHQ2tRzmgIU_OAHBoaOU")
 
 st.title("🌸 فزعة، تسولفها")
 st.subheader("من تعقيد أكاديمي… إلى جلسة سوالف")
@@ -22,50 +16,33 @@ st.subheader("من تعقيد أكاديمي… إلى جلسة سوالف")
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
 if uploaded_file:
-    try:
-        reader = PdfReader(uploaded_file)
-        # قراءة أول 15 صفحة
-        pages_to_read = reader.pages[:15] 
-        text_list = [page.extract_text() for page in pages_to_read if page.extract_text()]
-        full_text = " ".join(text_list)
-        
-        if not full_text:
-            st.error("الملف غير قابل للقراءة.")
-            st.stop()
-            
-    except Exception as e:
-        st.error(f"خطأ في الملف: {e}")
-        st.stop()
-
+    reader = PdfReader(uploaded_file)
+    full_text = "".join([page.extract_text() for page in reader.pages if page.extract_text()])
+    
     st.success("تم رفع الملف! اختاري نوع الفزعة:")
     col1, col2, col3 = st.columns(3)
     prompt = ""
     
-    context = f"\n\n Text: {full_text[:10000]}"
-
     if col1.button("🇸🇦 سولفها بالعربي"):
-        prompt = "اشرحي هالمحتوى بلهجة نجدية عفوية كأنك تسولفين معي:" + context
+        prompt = f"اشرحي النص بلهجة نجدية سوالف: {full_text}"
     if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
-        prompt = "ترجمي واشرحي هالمحتوى بلهجة نجدية:" + context
+        prompt = f"ترجمي واشرحي النص بلهجة نجدية: {full_text}"
     if col3.button("🇬🇧 English"):
-        prompt = "Explain this in simple conversational English:" + context
+        prompt = f"Explain this simply in English: {full_text}"
 
     if prompt:
         with st.spinner("قاعدين نفزع لك... ✨"):
             try:
-                model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                # تم تعديل اسم المودل هنا ليكون صالحاً
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content(prompt)
                 
-                if response.text:
-                    st.markdown("### 📖 الشرح المولد")
-                    st.write(response.text)
+                st.markdown("### 📖 الشرح المولد")
+                st.write(response.text)
 
-                    with st.spinner("جاري تجهيز الصوت..."):
-                        lang = 'en' if "English" in prompt else 'ar'
-                        tts = gTTS(text=response.text[:1000], lang=lang)
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-                            tts.save(fp.name)
-                            st.audio(fp.name)
-                            os.unlink(fp.name)
+                # توليد الصوت
+                tts = gTTS(text=response.text, lang='ar')
+                tts.save("voice.mp3")
+                st.audio("voice.mp3")
             except Exception as e:
                 st.error(f"حدث خطأ: {e}")
