@@ -1,98 +1,101 @@
 import streamlit as st
 import google.generativeai as genai
 from pypdf import PdfReader
-import requests # لاستدعاء ElevenLabs
+from elevenlabs.client import ElevenLabs
 import os
+import tempfile
 
 # --- 1. إعدادات الهوية ---
-st.set_page_config(page_title="فزعة - بودكاست احترافي", page_icon="🎙️")
+st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
     html, body, [class*="css"] { font-family: 'Tajawal', sans-serif; direction: rtl; text-align: right; }
-    .stButton>button { border-radius: 30px; background-color: #8A1538; color: white; height: 4em; font-size: 18px; }
-    h1 { color: #8A1538; text-align: center; }
+    .stButton>button {
+        width: 100%; border-radius: 25px; height: 3.5em;
+        background-color: #8A1538; color: white; border: none; font-weight: bold;
+    }
+    .stButton>button:hover { background-color: #FCE4EC !important; color: #8A1538 !important; border: 1px solid #8A1538 !important; }
+    h1, h2, h3 { color: #8A1538; text-align: center; }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# --- 2. إعداد المفاتيح ---
-GEMINI_API_KEY = "AIzaSy..." # مفتاح جمناي الخاص بك
-ELEVENLABS_API_KEY = "YOUR_ELEVENLABS_API_KEY" # مفتاح ايلفن لابس الخاص بك
+# --- 2. API Keys ---
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+eleven = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
-genai.configure(api_key=GEMINI_API_KEY)
-
-# --- 3. دالة توليد الصوت عبر ElevenLabs ---
-def generate_podcast_audio(text):
-    # اخترت لك صوت "Aria" أو "Layla" لأنهن الأفضل في العربية
-    # يمكنك تغيير الـ voice_id من موقعهم
-    voice_id = "EXAVITQu4vr4xnSDxMaL" # مثال لصوت احترافي
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    
-    headers = {
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-        "xi-api-key": ELEVENLABS_API_KEY
-    }
-    
-    data = {
-        "text": text,
-        "model_id": "eleven_multilingual_v2", # هذا الموديل يدعم العربية بطلاقة
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75,
-            "style": 0.5,
-            "use_speaker_boost": True
-        }
-    }
-    
-    response = requests.post(url, json=data, headers=headers)
-    if response.status_code == 200:
-        with open("podcast.mp3", "wb") as f:
-            f.write(response.content)
-        return "podcast.mp3"
-    else:
-        st.error(f"خطأ في ElevenLabs: {response.text}")
-        return None
+# --- 3. اختيار موديل ---
+def get_available_model():
+    try:
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        if 'models/gemini-1.5-flash' in models:
+            return 'gemini-1.5-flash'
+        return models[0]
+    except:
+        return 'gemini-1.5-flash'
 
 # --- 4. الواجهة ---
-st.markdown("<h1>🎙️ بودكاست فزعة</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>حولي محاضراتك لسوالف ممتعة (بصوت طبيعي) 🎧</p>", unsafe_allow_html=True)
+st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>من تعقيد أكاديمي… إلى جلسة سوالف صوتية</p>", unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader("ارفعي ملف الـ PDF", type="pdf")
+uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
 if uploaded_file:
-    # قراءة الملف
     reader = PdfReader(uploaded_file)
-    content = "".join([page.extract_text() for page in reader.pages if page.extract_text()])
-    
-    if content:
-        if st.button("✨ ابدأي جلسة السوالف"):
-            with st.spinner("نورة وسارة يجهزون المايكروفونات... 🎙️✨"):
-                
-                # برومبت البودكاست (Deep Dive)
-                prompt = f"""
-                اكتب سيناريو بودكاست تعليمي بلهجة نجدية بيضاء. 
-                الشخصيات: (نورة) طالبة ذكية تسأل، و(سارة) خبيرة تشرح بأسلوب ممتع وعميق.
-                الموضوع: {content}
-                
-                التعليمات:
-                - ابدأي بـ "يا هلا والله بنورة، اليوم موضوعنا دسم بس بنبسطه.."
-                - اجعلي الحوار متفاعلاً فيه "ما شاء الله"، "تخيلي"، "رهيب!".
-                - الشرح يكون Deep Dive، لا تتركين ولا معلومة مهمة.
-                - المحادثة يجب أن تكون نصاً واحداً متصلاً يقرأه الشخصان (كحوار).
-                - لا تكتبي أسماء الشخصيات في النص النهائي، فقط الحوار مباشرة.
-                """
-                
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                script = model.generate_content(prompt).text
-                
-                # تحويل السيناريو لصوت (بدون إظهار النص)
-                audio_file = generate_podcast_audio(script)
-                
-                if audio_file:
-                    st.success("جلسة السوالف جاهزة! استمتعي بالتعلم ☕🎧")
-                    st.audio(audio_file)
-    else:
-        st.error("تأكدي من محتوى الملف.")
+    full_text = ""
 
+    for page in reader.pages:
+        t = page.extract_text()
+        if t:
+            full_text += t
+
+    if full_text:
+        st.success("تم رفع الملف! اختاري الفزعة المطلوبة:")
+
+        if st.button("🎙️ خلهم يسولفون Deep Dive"):
+            
+            with st.spinner("قاعدين يسولفون لك ✨"):
+                
+                model_name = get_available_model()
+                model = genai.GenerativeModel(model_name)
+
+                prompt = f"""
+                حوّل النص التالي إلى جلسة سوالف بين بنت وولد بأسلوب Deep Dive،
+                سوالف نجدية بيضاء طبيعية جدًا،
+                يخوضون في التفاصيل الأكاديمية لكن بأسلوب ممتع،
+                لا تكتب مقدمات رسمية.
+
+                النص:
+                {full_text[:15000]}
+                """
+
+                response = model.generate_content(
+                    prompt,
+                    generation_config={
+                        "temperature": 0.8,
+                        "max_output_tokens": 3000
+                    }
+                )
+
+                conversation_text = response.text
+
+                # --- تقسيم النص بين صوتين ---
+                lines = conversation_text.split("\n")
+                
+                audio_segments = []
+
+                for i, line in enumerate(lines):
+                    if not line.strip():
+                        continue
+                    
+                    # بالتناوب: بنت ثم ولد
+                    voice_id = "Rachel" if i % 2 == 0 else "Josh"
+
+                    audio = eleven.text_to_speech.convert(
+                        voice_id=voice_id,
+                        model_id="eleven_multilingual_v2",
+                        text=line
+                    )
+
+                    aud
