@@ -7,7 +7,7 @@ import os
 # --- إعدادات جامعة نورة ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
 
-# --- الـ API Key الخاص بك (ضعيه بين الكوتشين) ---
+# --- الـ API Key الخاص بك ---
 genai.configure(api_key="AIzaSyAg5uwFJdtDZ4GXHQ2tRzmgIU_OAHBoaOU")
 
 st.title("🌸 فزعة، تسولفها")
@@ -33,8 +33,8 @@ if uploaded_file:
     if prompt:
         with st.spinner("قاعدين نفزع لك... ✨"):
             try:
-                # تم تعديل اسم المودل هنا ليكون صالحاً
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # استخدمنا المسار الكامل للمودل لضمان عمله
+                model = genai.GenerativeModel('models/gemini-1.5-flash')
                 response = model.generate_content(prompt)
                 
                 st.markdown("### 📖 الشرح المولد")
