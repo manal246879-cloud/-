@@ -17,31 +17,34 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. تهيئة المفاتيح ---
+# --- 2. تهيئة المفاتيح وفحصها ---
 try:
     GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=GEMINI_KEY)
+    
+    # محاولة جلب الموديلات المتاحة
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
     VOICE_1 = st.secrets["VOICE_ID_1"]
     VOICE_2 = st.secrets["VOICE_ID_2"]
-    genai.configure(api_key=GEMINI_KEY)
     client = ElevenLabs(api_key=ELEVEN_KEY)
 except Exception as e:
-    st.error(f"❌ مشكلة في الـ Secrets: {e}")
+    st.error("❌ مشكلة في المفاتيح. تأكدي من Secrets في Streamlit.")
     st.stop()
 
 # --- 3. دالة جلب السكريبت ---
 def get_script(prompt):
-    # محاولة الاتصال بالموديلات المتاحة لتجنب 404
-    for m_name in ['gemini-1.5-flash', 'gemini-pro']:
-        try:
-            model = genai.GenerativeModel(m_name)
-            response = model.generate_content([
-                "أنتِ سارة ونورة. حولي النص لحوار سوالف بنات طبيعي. التنسيق: سارة: [نص] نورة: [نص]. اكتفي بـ 3 تبادلات.",
-                prompt
-            ])
-            return response.text
-        except: continue
-    return None
+    # نستخدم أول موديل متاح في حسابك لتجنب 404
+    working_model = available_models[0] if available_models else "gemini-1.5-flash"
+    try:
+        model = genai.GenerativeModel(working_model)
+        response = model.generate_content([
+            "أنتِ سارة ونورة. حولي النص لحوار سوالف بنات طبيعي. التنسيق: سارة: [نص] نورة: [نص]. اكتفي بـ 3 تبادلات.",
+            prompt
+        ])
+        return response.text
+    except: return None
 
 # --- 4. الواجهة ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
@@ -65,31 +68,17 @@ if uploaded_file:
             task = f"Explain this in English dialogue between Sarah and Nora: {full_text[:6000]}"
 
         if task:
-            with st.spinner("جاري توليد الصوت... 🎧"):
+            with st.spinner("جاري تجهيز السوالف صوتياً... 🎧"):
                 script = get_script(task)
-                
-                if not script:
-                    st.error("❌ فشل الاتصال بجمناي (تأكدي من مفتاح جوجل)")
-                else:
+                if script:
                     lines = [l.strip() for l in script.split('\n') if ':' in l]
-                    audio_found = False
-                    
                     for line in lines:
                         try:
                             name, text = line.split(':', 1)
                             vid = VOICE_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_2
-                            
-                            # محاولة توليد الصوت
                             audio = client.generate(text=text.strip(), voice=vid, model="eleven_multilingual_v2")
-                            audio_bytes = b"".join(list(audio))
-                            
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3")
-                                audio_found = True
-                        except Exception as e:
-                            st.error(f"❌ فشل توليد الصوت لـ {line.split(':')[0]}: {e}")
-                    
-                    if audio_found:
-                        st.info("اسمعي السالفة بالترتيب من الأعلى ✨")
-                    else:
-                        st.warning("⚠️ لم يتم توليد أي صوت. تأكدي من رصيد ElevenLabs.")
+                            st.audio(b"".join(list(audio)), format="audio/mp3")
+                        except: continue
+                    st.info("اسمعي السالفة بالترتيب ✨")
+                else:
+                    st.error("فشل في الاتصال بجوجل. تأكدي من المفتاح.")
