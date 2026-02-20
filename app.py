@@ -23,7 +23,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. إعداد الـ API ---
-API_KEY = "AIzaSyAg5uwFJdtDZ4GXHQ2tRzmgIU_OAHBoaOU" 
+API_KEY = "AIzaSyAB-c1_jgZ_yBoPLYAvttwx4W1DyjaVmVM" 
 genai.configure(api_key=API_KEY)
 
 # دالة لتوليد الصوت الطبيعي
