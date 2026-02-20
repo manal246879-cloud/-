@@ -30,7 +30,7 @@ except Exception:
     st.error("⚠️ تأكدي من المفاتيح في Secrets")
     st.stop()
 
-# --- 3. اختيار الموديل تلقائياً (لتجنب 404) ---
+# --- 3. اختيار الموديل (لضمان عدم حدوث 404) ---
 def get_model():
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -41,7 +41,6 @@ def get_model():
 
 # --- 4. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>ارفعي المحاضرة واسمعي السالفة ✨</p>", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
@@ -50,7 +49,7 @@ if uploaded_file:
     full_text = "".join([p.extract_text() for p in reader.pages if p.extract_text()])
     
     if full_text.strip():
-        st.success("الملف جاهز! اختاري نوع السالفة:")
+        st.success("الملف جاهز!")
         col1, col2, col3 = st.columns(3)
         
         task = ""
@@ -62,10 +61,10 @@ if uploaded_file:
             task = f"Explain this in English dialogue between Sarah and Nora: {full_text[:6000]}"
 
         if task:
-            with st.spinner("قاعدين نجهز السالفة (صوت فقط)... 🎧"):
+            with st.spinner("جاري تجهيز السوالف... 🎧"):
                 try:
                     model = genai.GenerativeModel(get_model())
-                    sys_prompt = "You are Sarah and Nora. Talk naturally. Format: Sarah: [text] Nora: [text]. Max 3 exchanges."
+                    sys_prompt = "You are Sarah and Nora. Format: Sarah: [text] Nora: [text]. Max 3 exchanges."
                     response = model.generate_content([sys_prompt, task])
                     
                     script = response.text
@@ -74,9 +73,15 @@ if uploaded_file:
                     for line in lines:
                         try:
                             name, text = line.split(':', 1)
-                            # تحديد أي بنت تسولف عشان نختار صوتها
+                            # تحديد الصوت بناءً على الاسم
                             vid = VOICE_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_2
                             
-                            # توليد الصوت وتشغيله مباشرة بدون عرض النص
+                            # توليد وتشغيل الصوت فقط (بدون عرض النص)
                             audio = client.generate(text=text.strip(), voice=vid, model="eleven_multilingual_v2")
+                            st.audio(b"".join(list(audio)), format="audio/mp3")
+                        except:
+                            continue
                             
+                    st.info("اسمعي السالفة بالترتيب من الأعلى ✨")
+                except Exception as e:
+                    st.error(f"حدث خطأ: {e}")
