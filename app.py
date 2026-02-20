@@ -3,7 +3,7 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import requests
 
-# --- 1. الواجهة الأصلية (ممنوع التغيير) ---
+# --- 1. الواجهة الأصلية (ممنوع اللمس) ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸")
 st.markdown("""
     <style>
@@ -17,29 +17,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. تهيئة المفاتيح واكتشاف الموديل تلقائياً ---
+# --- 2. اكتشاف الموديل المتاح "فعلياً" في حسابك ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
     
-    # البحث عن أي موديل متاح في حسابك يدعم توليد المحتوى
-    # هذا يحل مشكلة "Model not found" للأبد
-    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    if not models:
-        st.error("لم يتم العثور على أي موديلات متاحة في حسابك.")
+    # جلب أي موديل متاح يدعم التوليد (عشان ما نقول اسم ويطلع غلط)
+    all_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    if not all_models:
+        st.error("لا يوجد موديلات متاحة في حسابك.")
         st.stop()
-    
-    # نختار موديل Flash إذا وجد، وإلا نأخذ أول واحد متاح
-    WORKING_MODEL = next((m for m in models if "flash" in m), models[0])
+    # نختار أول واحد في القائمة لأنه هو اللي غالباً يكون شغال
+    WORKING_MODEL = all_models[0]
 except Exception as e:
-    st.error(f"⚠️ خطأ في الاتصال بجوجل: {e}")
+    st.error(f"⚠️ خطأ في الاتصال: {e}")
     st.stop()
 
-# المعرفات الخاصة بك
 VOICE_ID_1 = "qi4PkV9c01kb869Vh7Su" # سارة
 VOICE_ID_2 = "a1KZUXKFVFDOb33I1uqr" # نورة
 
-# --- 3. دالة الصوت (إعدادات النبرة البشرية المتقلبة) ---
+# --- 3. دالة الصوت (بشرية غير روبوتية) ---
 def get_audio_clip(text, voice_id):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY}
@@ -47,16 +44,16 @@ def get_audio_clip(text, voice_id):
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.25,      # منخفض جداً لإعطاء عفوية قصوى ومنع الرتابة
+            "stability": 0.25,      # عفوية عالية
             "similarity_boost": 0.8, 
-            "style": 1.0,           # أقصى أداء تعبيري (دراما)
+            "style": 1.0,           # انفعالات بشرية
             "use_speaker_boost": True
         }
     }
     response = requests.post(url, json=data, headers=headers)
     return response.content if response.status_code == 200 else None
 
-# --- 4. واجهة المستخدم (الثلاثة أزرار) ---
+# --- 4. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
@@ -70,21 +67,20 @@ if file:
         
         task_prompt = ""
         if col1.button("🇸🇦 سولفها بالعربي"):
-            task_prompt = "سوالف بنات نجدية 'Deep Dive'. اشرحي بأسلوب بشري جداً وجمل قصيرة. استخدمي: (يووه، تخيلي، من جد، طيب، اسمعي، اممم)."
+            task_prompt = "سوالف بنات نجدية ديب دايف. جمل قصيرة جداً وحشو بشري (اممم، يووه، تخيلي، من جد)."
         if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            task_prompt = "ترجمي المحتوى ولخصيه ديب دايف بلهجة نجدية عفوية (سارة ونورة). حولي المصطلحات لأمثلة من حياتنا."
+            task_prompt = "ترجمي ولخصي ديب دايف بلهجة نجدية عفوية (سارة ونورة). جمل قصيرة ومقاطعات."
         if col3.button("🇬🇧 English"):
-            task_prompt = "Deep dive explanation in a natural, fast-paced English dialogue between Sarah and Nora. Use fillers like (Wait, wow, imagine)."
+            task_prompt = "Natural English deep dive dialogue between Sarah and Nora. Short sentences and fillers."
 
         if task_prompt:
-            with st.spinner("سارة ونورة يجهزون السالفة... 🎧"):
+            with st.spinner("سارة ونورة يقرأون المحاضرة... 🎧"):
                 try:
-                    # استخدام الموديل المكتشف تلقائياً
                     model = genai.GenerativeModel(WORKING_MODEL)
                     res = model.generate_content([
-                        f"أنتِ سارة ونورة. حولي النص التالي لسوالف بشرية عفوية. التنسيق: سارة: [نص] نورة: [نص]. المحتوى: {full_text[:7000]}",
+                        f"أنتِ سارة ونورة. حولي النص لسوالف بشرية عفوية (Deep Dive). التنسيق: سارة: [نص] نورة: [نص]. المحتوى: {full_text[:6000]}",
                         task_prompt,
-                        "مهم: اجعلي الجمل قصيرة جداً (مقطوعة) وأضيفي ضحكات ومقاطعات لكسر الروبوتية تماماً."
+                        "مهم: جمل قصيرة جداً، ضحكات، ومقاطعات بشرية."
                     ])
                     
                     lines = [l for l in res.text.split('\n') if ':' in l]
@@ -94,10 +90,8 @@ if file:
                         try:
                             name, speech = line.split(':', 1)
                             vid = VOICE_ID_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_ID_2
-                            # إضافة وقفة تنفسية خفيفة جداً
                             audio_clip = get_audio_clip(speech.strip() + "... ", vid)
-                            if audio_clip:
-                                all_audio += audio_clip
+                            if audio_clip: all_audio += audio_clip
                         except: continue
 
                     if all_audio:
@@ -105,4 +99,7 @@ if file:
                         st.audio(all_audio, format="audio/mp3")
                         st.balloons()
                 except Exception as e:
-                    st.error(f"حدث خطأ: {e}")
+                    if "429" in str(e):
+                        st.error("⚠️ انتهت محاولات جوجل المجانية لهذا اليوم (20 طلب). جربي مرة ثانية بكرة، أو استخدمي مفتاح API جديد.")
+                    else:
+                        st.error(f"حدث خطأ: {e}")
