@@ -3,7 +3,7 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import requests
 
-# --- 1. إعدادات الواجهة والستايل ---
+# --- 1. إعدادات الصفحة والستايل ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
 st.markdown("""
     <style>
@@ -17,19 +17,25 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. تهيئة المفاتيح وفحص الموديل ---
+# --- 2. تهيئة المفاتيح وفحص الموديل المتاح ---
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # جلب المفاتيح من Secrets
+    GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
+    genai.configure(api_key=GEMINI_KEY)
     
-    # البحث عن موديل جماني المتاح تلقائياً
-    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    WORKING_MODEL = models[0] if models else "gemini-pro"
+    # اختيار موديل جماني المتاح تلقائياً لتجنب خطأ 404
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    WORKING_MODEL = available_models[0] if available_models else "gemini-pro"
 except Exception as e:
-    st.error("⚠️ تأكدي من ضبط Secrets بشكل صحيح (GEMINI_API_KEY و ELEVENLABS_API_KEY)")
+    st.error("⚠️ تأكدي من ضبط GEMINI_API_KEY و ELEVENLABS_API_KEY في Secrets")
     st.stop()
 
-# --- 3. دالة تحويل النص لصوت (Direct API) ---
+# --- 3. المعرفات التي اخترتيها (بدون أي تأليف) ---
+VOICE_ID_1 = "qi4PkV9c01kb869Vh7Su" # سارة
+VOICE_ID_2 = "a1KZUXKFVFDOb33I1uqr" # نورة
+
+# --- 4. دالة تحويل النص لصوت (Direct API) ---
 def text_to_speech(text, voice_id):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {
@@ -40,7 +46,7 @@ def text_to_speech(text, voice_id):
     data = {
         "text": text,
         "model_id": "eleven_multilingual_v2",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75} # جودة عالية
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}
     }
     response = requests.post(url, json=data, headers=headers)
     if response.status_code == 200:
@@ -49,60 +55,52 @@ def text_to_speech(text, voice_id):
         st.error(f"خطأ في الصوت: {response.text}")
         return None
 
-# --- 4. واجهة المستخدم ---
+# --- 5. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
-    # نأخذ أول 10 صفحات فقط لضمان عدم استهلاك الحروف بسرعة
-    full_text = "".join([p.extract_text() for p in reader.pages[:10] if p.extract_text()])
+    # نأخذ أول 5 صفحات للاقتصاد في الحروف
+    full_text = "".join([p.extract_text() for p in reader.pages[:5] if p.extract_text()])
     
     if full_text.strip():
-        st.success("الملف جاهز! اختاري كيف تبين الشرح:")
+        st.success("الملف جاهز! اختاري نوع السالفة:")
         col1, col2, col3 = st.columns(3)
         
         task = ""
         if col1.button("🇸🇦 سولفها بالعربي"):
-            task = f"اشرحي هذا المحتوى بلهجة نجدية سوالف بنات بين سارة ونورة. اجعلي الحوار طويلاً ومفصلاً (حوالي 10 تبادلات): {full_text[:6000]}"
+            task = f"اشرحي المحتوى بلهجة نجدية سوالف بنات بين سارة ونورة (10 تبادلات): {full_text[:5000]}"
         if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            task = f"ترجمي واشرحي بلهجة نجدية سوالف بين سارة ونورة بشكل مفصل (10 تبادلات): {full_text[:6000]}"
+            task = f"ترجمي واشرحي بلهجة نجدية سوالف بين سارة ونورة (10 تبادلات): {full_text[:5000]}"
         if col3.button("🇬🇧 English"):
-            task = f"Explain this content in a natural English dialogue between Sarah and Nora (10 exchanges): {full_text[:6000]}"
+            task = f"Explain this as a dialogue between Sarah and Nora (10 exchanges): {full_text[:5000]}"
 
         if task:
-            with st.spinner("جاري تجهيز السوالف صوتياً... 🎧"):
+            with st.spinner("جاري تجهيز السوالف... 🎧"):
                 try:
-                    # 1. توليد السكريبت من Gemini
+                    # توليد السكريبت (20 جملة إجمالاً)
                     model = genai.GenerativeModel(WORKING_MODEL)
                     response = model.generate_content([
-                        "أنتِ سارة ونورة. حولي النص لحوار سوالف بنات طبيعي جداً. التنسيق: سارة: [نص] نورة: [نص]. التزمي بـ 10 تبادلات حوارية (20 جملة إجمالاً).",
+                        "أنتِ سارة ونورة. التنسيق: سارة: [نص] نورة: [نص]. التزمي بـ 10 تبادلات (20 جملة).",
                         task
                     ])
                     
-                    # 2. تقسيم الحوار ومعالجته
                     lines = [l.strip() for l in response.text.split('\n') if ':' in l]
-                    
-                    # أصوات Rachel و Bella (أفضل أصوات للمشتركين)
-                    VOICE_SARAH = "21m0pTQbwHOo96WRhcpx" 
-                    VOICE_NORA = "EXAVITQu4vr4xnNLTSrf"
 
-                    # 3. تحويل كل جملة لصوت وعرضها
-                    for i, line in enumerate(lines):
+                    # تحويل كل جملة لصوت باستخدام المعرفات التي اخترتيها
+                    for line in lines:
                         try:
-                            name, text = line.split(':', 1)
-                            # تبديل الأصوات بناءً على الاسم
-                            vid = VOICE_SARAH if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_NORA
+                            name, speech = line.split(':', 1)
+                            # اختيار الصوت بناءً على الاسم
+                            vid = VOICE_ID_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_ID_2
                             
-                            audio_data = text_to_speech(text.strip(), vid)
+                            audio_data = text_to_speech(speech.strip(), vid)
                             if audio_data:
-                                # عرض مشغل الصوت مع تسمية بسيطة (سارة 1، نورة 1...)
                                 st.audio(audio_data, format="audio/mp3")
                         except:
                             continue
                     
-                    st.info("اسمعي السالفة بالترتيب من الأعلى ✨")
-                    st.caption(f"تم استهلاك حوالي {len(response.text)} حرف من باقتك.")
-                    
+                    st.info("اسمعي السالفة بالترتيب ✨")
                 except Exception as e:
                     st.error(f"حدث خطأ: {e}")
