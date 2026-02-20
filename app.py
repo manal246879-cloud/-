@@ -3,9 +3,8 @@ import google.generativeai as genai
 from pypdf import PdfReader
 from elevenlabs.client import ElevenLabs
 
-# --- 1. الإعدادات والستايل ---
+# --- 1. الستايل ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
-
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -26,20 +25,25 @@ try:
     VOICE_2 = st.secrets["VOICE_ID_2"]
     genai.configure(api_key=GEMINI_KEY)
     client = ElevenLabs(api_key=ELEVEN_KEY)
-except Exception:
-    st.error("⚠️ تأكدي من المفاتيح في Secrets")
+except Exception as e:
+    st.error(f"❌ مشكلة في الـ Secrets: {e}")
     st.stop()
 
-# --- 3. اختيار الموديل (لضمان عدم حدوث 404) ---
-def get_model():
-    try:
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        for m in models:
-            if '1.5-flash' in m: return m
-        return models[0]
-    except: return "gemini-pro"
+# --- 3. دالة جلب السكريبت ---
+def get_script(prompt):
+    # محاولة الاتصال بالموديلات المتاحة لتجنب 404
+    for m_name in ['gemini-1.5-flash', 'gemini-pro']:
+        try:
+            model = genai.GenerativeModel(m_name)
+            response = model.generate_content([
+                "أنتِ سارة ونورة. حولي النص لحوار سوالف بنات طبيعي. التنسيق: سارة: [نص] نورة: [نص]. اكتفي بـ 3 تبادلات.",
+                prompt
+            ])
+            return response.text
+        except: continue
+    return None
 
-# --- 4. واجهة المستخدم ---
+# --- 4. الواجهة ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
@@ -61,27 +65,31 @@ if uploaded_file:
             task = f"Explain this in English dialogue between Sarah and Nora: {full_text[:6000]}"
 
         if task:
-            with st.spinner("جاري تجهيز السوالف... 🎧"):
-                try:
-                    model = genai.GenerativeModel(get_model())
-                    sys_prompt = "You are Sarah and Nora. Format: Sarah: [text] Nora: [text]. Max 3 exchanges."
-                    response = model.generate_content([sys_prompt, task])
-                    
-                    script = response.text
+            with st.spinner("جاري توليد الصوت... 🎧"):
+                script = get_script(task)
+                
+                if not script:
+                    st.error("❌ فشل الاتصال بجمناي (تأكدي من مفتاح جوجل)")
+                else:
                     lines = [l.strip() for l in script.split('\n') if ':' in l]
+                    audio_found = False
                     
                     for line in lines:
                         try:
                             name, text = line.split(':', 1)
-                            # تحديد الصوت بناءً على الاسم
                             vid = VOICE_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_2
                             
-                            # توليد وتشغيل الصوت فقط (بدون عرض النص)
+                            # محاولة توليد الصوت
                             audio = client.generate(text=text.strip(), voice=vid, model="eleven_multilingual_v2")
-                            st.audio(b"".join(list(audio)), format="audio/mp3")
-                        except:
-                            continue
+                            audio_bytes = b"".join(list(audio))
                             
-                    st.info("اسمعي السالفة بالترتيب من الأعلى ✨")
-                except Exception as e:
-                    st.error(f"حدث خطأ: {e}")
+                            if audio_bytes:
+                                st.audio(audio_bytes, format="audio/mp3")
+                                audio_found = True
+                        except Exception as e:
+                            st.error(f"❌ فشل توليد الصوت لـ {line.split(':')[0]}: {e}")
+                    
+                    if audio_found:
+                        st.info("اسمعي السالفة بالترتيب من الأعلى ✨")
+                    else:
+                        st.warning("⚠️ لم يتم توليد أي صوت. تأكدي من رصيد ElevenLabs.")
