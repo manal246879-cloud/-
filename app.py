@@ -4,7 +4,7 @@ from pypdf import PdfReader
 import requests
 
 # --- 1. إعدادات الصفحة والستايل ---
-st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
+st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸")
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -13,94 +13,87 @@ st.markdown("""
         width: 100%; border-radius: 25px; height: 3.5em;
         background-color: #8A1538; color: white; border: none; font-weight: bold;
     }
-    h1 { color: #8A1538; text-align: center; font-family: 'Tajawal'; }
+    .chat-box { background-color: #f9f9f9; padding: 15px; border-radius: 15px; border-right: 5px solid #8A1538; margin-bottom: 10px; }
+    h1 { color: #8A1538; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. تهيئة المفاتيح وفحص الموديل المتاح ---
+# --- 2. تهيئة المفاتيح ---
 try:
-    # جلب المفاتيح من Secrets
-    GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
-    genai.configure(api_key=GEMINI_KEY)
-    
-    # اختيار موديل جماني المتاح تلقائياً لتجنب خطأ 404
-    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    WORKING_MODEL = available_models[0] if available_models else "gemini-pro"
-except Exception as e:
-    st.error("⚠️ تأكدي من ضبط GEMINI_API_KEY و ELEVENLABS_API_KEY في Secrets")
+    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    WORKING_MODEL = models[0] if models else "gemini-pro"
+except:
+    st.error("⚠️ تأكدي من المفاتيح في Secrets")
     st.stop()
 
-# --- 3. المعرفات التي اخترتيها (بدون أي تأليف) ---
+# المعرفات الخاصة بك
 VOICE_ID_1 = "qi4PkV9c01kb869Vh7Su" # سارة
 VOICE_ID_2 = "a1KZUXKFVFDOb33I1uqr" # نورة
 
-# --- 4. دالة تحويل النص لصوت (Direct API) ---
-def text_to_speech(text, voice_id):
+# --- 3. دالة تحويل النص لصوت (محسنة لتكون بشرية أكثر) ---
+def get_audio_clip(text, voice_id):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-        "xi-api-key": ELEVEN_KEY
-    }
+    headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY}
     data = {
         "text": text,
         "model_id": "eleven_multilingual_v2",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}
+        "voice_settings": {
+            "stability": 0.4,           # تقليل الثبات يجعل الصوت أكثر تعبيراً
+            "similarity_boost": 0.8,    # زيادة التشابه مع الصوت الأصلي
+            "style": 0.5,               # إضافة نبرة حيوية
+            "use_speaker_boost": True
+        }
     }
     response = requests.post(url, json=data, headers=headers)
-    if response.status_code == 200:
-        return response.content
-    else:
-        st.error(f"خطأ في الصوت: {response.text}")
-        return None
+    return response.content if response.status_code == 200 else None
 
-# --- 5. واجهة المستخدم ---
+# --- 4. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
-uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
+file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
-if uploaded_file:
-    reader = PdfReader(uploaded_file)
-    # نأخذ أول 5 صفحات للاقتصاد في الحروف
+if file:
+    reader = PdfReader(file)
     full_text = "".join([p.extract_text() for p in reader.pages[:5] if p.extract_text()])
     
     if full_text.strip():
-        st.success("الملف جاهز! اختاري نوع السالفة:")
+        st.success("الملف جاهز!")
         col1, col2, col3 = st.columns(3)
         
-        task = ""
+        prompt_type = ""
         if col1.button("🇸🇦 سولفها بالعربي"):
-            task = f"اشرحي المحتوى بلهجة نجدية سوالف بنات بين سارة ونورة (10 تبادلات): {full_text[:5000]}"
+            prompt_type = "اشرحي المحتوى بلهجة نجدية كأنها سوالف بنات حقيقية، استخدمي كلمات مثل 'تخيلي، شوفي، يعني، صراحة'. الحوار بين سارة ونورة."
         if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            task = f"ترجمي واشرحي بلهجة نجدية سوالف بين سارة ونورة (10 تبادلات): {full_text[:5000]}"
+            prompt_type = "ترجمي واشرحي بلهجة نجدية سوالف بنات (سارة ونورة) بشكل عفوي وسريع."
         if col3.button("🇬🇧 English"):
-            task = f"Explain this as a dialogue between Sarah and Nora (10 exchanges): {full_text[:5000]}"
+            prompt_type = "Explain as a natural, fast-paced English dialogue between Sarah and Nora."
 
-        if task:
-            with st.spinner("جاري تجهيز السوالف... 🎧"):
-                try:
-                    # توليد السكريبت (20 جملة إجمالاً)
-                    model = genai.GenerativeModel(WORKING_MODEL)
-                    response = model.generate_content([
-                        "أنتِ سارة ونورة. التنسيق: سارة: [نص] نورة: [نص]. التزمي بـ 10 تبادلات (20 جملة).",
-                        task
-                    ])
+        if prompt_type:
+            with st.spinner("جاري تحضير السالفة... ☕"):
+                model = genai.GenerativeModel(WORKING_MODEL)
+                res = model.generate_content([
+                    f"أنتِ سارة ونورة. حولي هذا النص لسوالف عفوية جداً وبشرية. التنسيق: سارة: [نص] نورة: [نص]. المحتوى: {full_text[:5000]}",
+                    "اجعلي الحوار 8 تبادلات سريعة."
+                ])
+                
+                lines = [l for l in res.text.split('\n') if ':' in l]
+                
+                all_audio = b"" # لجمع كل المقاطع هنا
+                
+                st.markdown("### 📝 نص الحوار:")
+                for line in lines:
+                    name, speech = line.split(':', 1)
+                    # إظهار النص على الشاشة
+                    st.markdown(f"<div class='chat-box'><b>{name}:</b> {speech}</div>", unsafe_allow_html=True)
                     
-                    lines = [l.strip() for l in response.text.split('\n') if ':' in l]
+                    # تحويل للصوت وجمعه
+                    vid = VOICE_ID_1 if "سارة" in name or "Sarah" in name else VOICE_ID_2
+                    audio_clip = get_audio_clip(speech.strip(), vid)
+                    if audio_clip:
+                        all_audio += audio_clip # دمج ملفات الصوت
 
-                    # تحويل كل جملة لصوت باستخدام المعرفات التي اخترتيها
-                    for line in lines:
-                        try:
-                            name, speech = line.split(':', 1)
-                            # اختيار الصوت بناءً على الاسم
-                            vid = VOICE_ID_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_ID_2
-                            
-                            audio_data = text_to_speech(speech.strip(), vid)
-                            if audio_data:
-                                st.audio(audio_data, format="audio/mp3")
-                        except:
-                            continue
-                    
-                    st.info("اسمعي السالفة بالترتيب ✨")
-                except Exception as e:
-                    st.error(f"حدث خطأ: {e}")
+                if all_audio:
+                    st.markdown("### 🎧 استمعي للسالفة كاملة:")
+                    st.audio(all_audio, format="audio/mp3")
+                    st.balloons()
