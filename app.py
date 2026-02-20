@@ -1,7 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 from pypdf import PdfReader
-from elevenlabs.client import ElevenLabs
+from elevenlabs import generate, set_api_key
 
 # --- 1. الستايل ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
@@ -23,11 +23,11 @@ try:
     genai.configure(api_key=GEMINI_KEY)
     
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
+    set_api_key(ELEVEN_KEY) # تثبيت المفتاح بالطريقة المستقرة
+    
     VOICE_1 = st.secrets["VOICE_ID_1"]
     VOICE_2 = st.secrets["VOICE_ID_2"]
-    client = ElevenLabs(api_key=ELEVEN_KEY)
     
-    # جلب الموديلات المتاحة لجمناي
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
 except Exception as e:
     st.error(f"❌ مشكلة في إعدادات المفاتيح: {e}")
@@ -78,19 +78,17 @@ if uploaded_file:
                             # اختيار الصوت
                             vid = VOICE_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_2
                             
-                            # توليد الصوت
-                            audio_stream = client.generate(text=text.strip(), voice=vid, model="eleven_multilingual_v2")
-                            audio_bytes = b"".join(list(audio_stream))
-                            
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3")
-                            else:
-                                st.warning(f"⚠️ فشل توليد صوت لـ {name}")
+                            # توليد الصوت بالطريقة المستقرة
+                            audio = generate(
+                                text=text.strip(),
+                                voice=vid,
+                                model="eleven_multilingual_v2"
+                            )
+                            st.audio(audio, format="audio/mp3")
                                 
                         except Exception as audio_err:
-                            # إذا فشل الصوت، بيطبع لك السبب هنا
-                            st.error(f"❌ خطأ في ElevenLabs: {audio_err}")
+                            st.error(f"❌ خطأ في الصوت: {audio_err}")
                     
-                    st.info("اسمعي السالفة بالترتيب ✨")
+                    st.info("اسمعي السالفة بالترتيب من الأعلى ✨")
                 else:
-                    st.error("❌ فشل في كتابة السوالف. جربي مرة ثانية.")
+                    st.error("❌ فشل في الاتصال بجوجل.")
