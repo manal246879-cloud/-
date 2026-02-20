@@ -21,13 +21,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. إعداد الـ API بالمفتاح الجديد ---
-GEMINI_API_KEY = "AIzaSyBTOVaLSFepUSl8YUlT42MneLVRWl3ZTX0"
-genai.configure(api_key=GEMINI_API_KEY)
+# --- 2. إعداد الـ API بشكل آمن ---
+# ملاحظة: تم حذف المفتاح. يفضل وضعه في Secrets الخاصة بـ Streamlit 
+# أو استخدامه كمتغير بيئة.
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "") 
 
-def get_available_model():
-    # نستخدم 1.5-flash لأنه الأسرع والأفضل حالياً للتعامل مع النصوص المستخرجة
-    return 'gemini-1.5-flash'
+if not GEMINI_API_KEY:
+    st.error("⚠️ يرجى إضافة مفتاح API في إعدادات Secrets")
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # --- 3. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
@@ -47,36 +49,45 @@ if uploaded_file:
             st.success("الملف جاهز! وش تبين نسوي؟")
             col1, col2, col3 = st.columns(3)
             final_prompt = ""
+            lang_code = 'ar' # الافتراضي عربي
 
             # الشخصية النجدية الودودة
             system_behavior = "أنتِ خبيرة أكاديمية بأسلوب 'سوالف نجدية' بيضاء ولطيفة. اشرحي بعمق وتبسيط مستخدمة الإيموجيات ✨."
 
             if col1.button("🇸🇦 سولفها بالعربي"):
                 final_prompt = f"{system_behavior} اشرحي هذا المحتوى بلهجة نجدية سوالف وشرح مفصل جداً: {full_text}"
+                lang_code = 'ar'
             
             if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
                 final_prompt = f"{system_behavior} النص بالإنجليزية، ترجميه واشرحيه بلهجة نجدية سوالف مع الحفاظ على المصطلحات التقنية الإنجليزية: {full_text}"
+                lang_code = 'ar'
             
             if col3.button("🇬🇧 English"):
                 final_prompt = f"Explain this academic text in a deep-dive, friendly conversational English: {full_text}"
+                lang_code = 'en'
 
             if final_prompt:
-                with st.spinner("قاعدين نضبط لك الفزعة... ☕"):
-                    model = genai.GenerativeModel(get_available_model())
+                with st.spinner("قاعدين نضبط لك السالفة... ☕"):
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     response = model.generate_content(final_prompt)
                     
-                    st.markdown("---")
-                    st.markdown("### 📖 الشرح والزبدة:")
-                    st.write(response.text)
-
-                    # تحويل النص لصوت (لأول 800 حرف لضمان السرعة)
-                    try:
-                        clean_text = response.text.replace("*", "").replace("#", "")
-                        tts = gTTS(text=clean_text[:800], lang='ar')
-                        tts.save("voice.mp3")
-                        st.audio("voice.mp3")
-                    except:
-                        st.info("تم توليد الشرح النصي بنجاح (الصوت غير متاح حالياً لهذه الاستجابة).")
+                    # تنظيف النص وتجهيزه للصوت
+                    clean_text = response.text.replace("*", "").replace("#", "").strip()
+                    
+                    if clean_text:
+                        # تحويل النص لصوت (لأول 1000 حرف لضمان السرعة)
+                        try:
+                            tts = gTTS(text=clean_text[:1000], lang=lang_code)
+                            tts.save("voice.mp3")
+                            
+                            st.markdown("---")
+                            st.markdown("### 🎧 اسمعي السالفة هنا:")
+                            st.audio("voice.mp3")
+                            
+                            # تم حذف st.write(response.text) ليكون التركيز على الصوت فقط بناءً على طلبك
+                            st.info("اضغطي على زر التشغيل أعلاه لسماع الشرح ✨")
+                        except Exception as e:
+                            st.error(f"عجزنا نطلع الصوت، بس هذا الشرح مكتوب: \n\n {response.text}")
         else:
             st.error("المعذرة، الملف ما فيه نص نقدر نقراه.")
     except Exception as e:
