@@ -3,4 +3,3 @@ google-generativeai>=0.7.0
 pypdf
 elevenlabs
 requests
-pip install edge-tts
