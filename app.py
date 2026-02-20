@@ -3,7 +3,7 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import requests
 
-# --- 1. إعدادات الصفحة والستايل ---
+# --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
 
 st.markdown("""
@@ -22,15 +22,31 @@ st.markdown("""
 try:
     GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
-    VOICE_1 = st.secrets["VOICE_ID_1"]
-    VOICE_2 = st.secrets["VOICE_ID_2"]
-    
     genai.configure(api_key=GEMINI_KEY)
 except Exception as e:
-    st.error("⚠️ تأكدي من إعداد Secrets بشكل صحيح.")
+    st.error("⚠️ تأكدي من إعداد API Keys في Secrets (Gemini و ElevenLabs)")
     st.stop()
 
-# --- 3. دالة تحويل النص لصوت (الاتصال المباشر بالسيرفر) ---
+# --- 3. دالة لجلب الأصوات المجانية المتاحة في حسابك تلقائياً ---
+def get_available_voices():
+    url = "https://api.elevenlabs.io/v1/voices"
+    headers = {"xi-api-key": ELEVEN_KEY}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        voices = response.json().get('voices', [])
+        # تصفية الأصوات لاختيار الأصوات الأساسية (Premade) فقط لتجنب خطأ الدفع
+        premade_voices = [v['voice_id'] for v in voices if v.get('category') == 'premade']
+        if len(premade_voices) >= 2:
+            return premade_voices[0], premade_voices[1]
+        elif len(premade_voices) == 1:
+            return premade_voices[0], premade_voices[0]
+        else:
+            # إذا لم يجد أصوات بريميد، يأخذ أول أصوات متاحة
+            all_ids = [v['voice_id'] for v in voices]
+            return all_ids[0], all_ids[1]
+    return None, None
+
+# --- 4. دالة تحويل النص لصوت ---
 def text_to_speech_direct(text, voice_id):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {
@@ -46,11 +62,9 @@ def text_to_speech_direct(text, voice_id):
     response = requests.post(url, json=data, headers=headers)
     if response.status_code == 200:
         return response.content
-    else:
-        st.error(f"خطأ من سيرفر الصوت: {response.text}")
-        return None
+    return None
 
-# --- 4. اختيار موديل جماني تلقائياً (حل 404) ---
+# --- 5. اختيار موديل جماني ---
 def get_model():
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -59,7 +73,7 @@ def get_model():
         return models[0]
     except: return "gemini-pro"
 
-# --- 5. واجهة المستخدم ---
+# --- 6. الواجهة ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
@@ -82,6 +96,12 @@ if uploaded_file:
 
         if task:
             with st.spinner("جاري تجهيز السوالف... 🎧"):
+                # جلب الأصوات المسموحة تلقائياً
+                v1, v2 = get_available_voices()
+                if not v1:
+                    st.error("لم نتمكن من العثور على أصوات متاحة في حسابك.")
+                    st.stop()
+                
                 try:
                     model = genai.GenerativeModel(get_model())
                     response = model.generate_content([
@@ -93,11 +113,10 @@ if uploaded_file:
                     
                     for line in lines:
                         name, text = line.split(':', 1)
-                        # اختيار الصوت
-                        vid = VOICE_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_2
+                        # استخدام الصوت الأول لسارة والثاني لنورة تلقائياً
+                        current_vid = v1 if any(n in name.lower() for n in ["سارة", "sarah"]) else v2
                         
-                        # توليد الصوت بالطريقة المباشرة
-                        audio_data = text_to_speech_direct(text.strip(), vid)
+                        audio_data = text_to_speech_direct(text.strip(), current_vid)
                         if audio_data:
                             st.audio(audio_data, format="audio/mp3")
                             
