@@ -1,11 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 from pypdf import PdfReader
-import edge_tts
-import asyncio
+from gtts import gTTS
 import os
 
-# --- 1. إعدادات الهوية البصرية (جامعة نورة) ---
+# --- 1. إعدادات الهوية البصرية ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
 
 st.markdown("""
@@ -15,81 +14,70 @@ st.markdown("""
     .stButton>button {
         width: 100%; border-radius: 25px; height: 3.5em;
         background-color: #8A1538; color: white; border: none; font-weight: bold;
+        transition: 0.3s;
     }
     .stButton>button:hover { background-color: #FCE4EC !important; color: #8A1538 !important; border: 1px solid #8A1538 !important; }
     h1, h2, h3 { color: #8A1538; text-align: center; }
-    .stAudio { margin-top: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# دالة لتوليد الصوت الطبيعي
-async def generate_natural_audio(text, output_file):
-    # صوت "Zariyah" سعودي نسائي طبيعي
-    voice = "ar-SA-ZariyahNeural"
-    communicate = edge_tts.Communicate(text, voice, rate="+10%") 
-    await communicate.save(output_file)
+# --- 2. إعداد الـ API بالمفتاح الجديد ---
+GEMINI_API_KEY = "AIzaSyBTOVaLSFepUSl8YUlT42MneLVRWl3ZTX0"
+genai.configure(api_key=GEMINI_API_KEY)
 
-# --- 2. واجهة المستخدم ---
+def get_available_model():
+    # نستخدم 1.5-flash لأنه الأسرع والأفضل حالياً للتعامل مع النصوص المستخرجة
+    return 'gemini-1.5-flash'
+
+# --- 3. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>اسمعي شرح محاضرتك كأنها سوالف بين نورة ومنال</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>حولي تعقيد المحاضرات.. لجلسة سوالف ممتعة ✨</p>", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
 if uploaded_file:
-    reader = PdfReader(uploaded_file)
-    full_text = "".join([p.extract_text() for p in reader.pages if p.extract_text()])
-    
-    if full_text:
-        st.success("تم رفع الملف! اختاري وش تبين تسمعين:")
-        col1, col2, col3 = st.columns(3)
+    try:
+        reader = PdfReader(uploaded_file)
+        full_text = ""
+        for page in reader.pages:
+            t = page.extract_text()
+            if t: full_text += t + "\n"
         
-        # سكريبت الحوار بين نورة ومنال
-        base_prompt = f"""
-        حولي النص الأكاديمي التالي إلى حوار "سكريبت" طويل ومفصل بين بنتين سعوديتين (نورة ومنال).
-        - نورة: هي الدافورة اللي تشرح بذكاء وحماس.
-        - منال: هي اللي تسأل أسئلة ذكية وتبي تفهم التفاصيل.
-        - الأسلوب: سوالف نجدية عميقة، ممتعة، وبدون اختصار. 
-        - اشرحي كل شيء في النص.
-        - لا تكتبي (نورة:) و (منال:) في النص، اجعليه حواراً متصلاً كأنه جلسة تسجيل.
-        النص: {full_text}
-        """
+        if full_text.strip():
+            st.success("الملف جاهز! وش تبين نسوي؟")
+            col1, col2, col3 = st.columns(3)
+            final_prompt = ""
 
-        final_prompt = ""
-        if col1.button("🇸🇦 سوالف نجدية"):
-            final_prompt = base_prompt
-        if col2.button("🇺🇸➡️🇸🇦 ترجمة وسوالف"):
-            final_prompt = "ترجمي النص التالي للعربي ثم " + base_prompt
-        if col3.button("🇬🇧 English Session"):
-            final_prompt = f"Create a deep-dive conversation between two students, Nora and Manal, discussing this PDF in a friendly English style. Text: {full_text}"
+            # الشخصية النجدية الودودة
+            system_behavior = "أنتِ خبيرة أكاديمية بأسلوب 'سوالف نجدية' بيضاء ولطيفة. اشرحي بعمق وتبسيط مستخدمة الإيموجيات ✨."
 
-        if final_prompt:
-            with st.spinner("نورة ومنال قاعدين يجهزون السوالف... لحظات ✨"):
-                try:
-                    # --- ربط المفتاح من السيكرتس ---
-                    if "GEMINI_API_KEY" in st.secrets:
-                        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    else:
-                        st.error("المفتاح غير موجود في Secrets!")
-                        st.stop()
+            if col1.button("🇸🇦 سولفها بالعربي"):
+                final_prompt = f"{system_behavior} اشرحي هذا المحتوى بلهجة نجدية سوالف وشرح مفصل جداً: {full_text}"
+            
+            if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
+                final_prompt = f"{system_behavior} النص بالإنجليزية، ترجميه واشرحيه بلهجة نجدية سوالف مع الحفاظ على المصطلحات التقنية الإنجليزية: {full_text}"
+            
+            if col3.button("🇬🇧 English"):
+                final_prompt = f"Explain this academic text in a deep-dive, friendly conversational English: {full_text}"
 
-                    # 1. توليد الحوار من Gemini
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+            if final_prompt:
+                with st.spinner("قاعدين نضبط لك الفزعة... ☕"):
+                    model = genai.GenerativeModel(get_available_model())
                     response = model.generate_content(final_prompt)
-                    generated_script = response.text
-
-                    # 2. تحويل الحوار لصوت طبيعي
-                    audio_file = "faza_audio.mp3"
-                    asyncio.run(generate_natural_audio(generated_script, audio_file))
                     
-                    # 3. عرض النتيجة
                     st.markdown("---")
-                    st.markdown("### 🎧 جاهز! اسمعي الفزعة:")
-                    st.audio(audio_file)
-                    
-                    with open(audio_file, "rb") as f:
-                        st.download_button("تحميل المحادثة MP3", f, file_name="nora_manal_session.mp3")
-                        
-                except Exception as e:
-                    st.error(f"حدث خطأ: {e}")
-    else:
-        st.error("الملف غير قابل للقراءة.")
+                    st.markdown("### 📖 الشرح والزبدة:")
+                    st.write(response.text)
+
+                    # تحويل النص لصوت (لأول 800 حرف لضمان السرعة)
+                    try:
+                        clean_text = response.text.replace("*", "").replace("#", "")
+                        tts = gTTS(text=clean_text[:800], lang='ar')
+                        tts.save("voice.mp3")
+                        st.audio("voice.mp3")
+                    except:
+                        st.info("تم توليد الشرح النصي بنجاح (الصوت غير متاح حالياً لهذه الاستجابة).")
+        else:
+            st.error("المعذرة، الملف ما فيه نص نقدر نقراه.")
+    except Exception as e:
+        st.error(f"حصل خطأ بسيط: {e}")
