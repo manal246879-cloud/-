@@ -1,9 +1,9 @@
 import streamlit as st
 import google.generativeai as genai
 from pypdf import PdfReader
-import elevenlabs
+import requests
 
-# --- 1. إعدادات الصفحة ---
+# --- 1. إعدادات الصفحة والستايل ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
 
 st.markdown("""
@@ -26,28 +26,40 @@ try:
     VOICE_2 = st.secrets["VOICE_ID_2"]
     
     genai.configure(api_key=GEMINI_KEY)
-    
-    # تهيئة اليفن لابز بالطريقة الجديدة والقديمة سوا عشان نضمنها
-    try:
-        from elevenlabs.client import ElevenLabs
-        client = ElevenLabs(api_key=ELEVEN_KEY)
-    except:
-        elevenlabs.set_api_key(ELEVEN_KEY)
-
 except Exception as e:
     st.error("⚠️ تأكدي من إعداد Secrets بشكل صحيح.")
     st.stop()
 
-# --- 3. اختيار الموديل تلقائياً (حل 404) ---
-def get_working_model():
+# --- 3. دالة تحويل النص لصوت (الاتصال المباشر بالسيرفر) ---
+def text_to_speech_direct(text, voice_id):
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": ELEVEN_KEY
+    }
+    data = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.5}
+    }
+    response = requests.post(url, json=data, headers=headers)
+    if response.status_code == 200:
+        return response.content
+    else:
+        st.error(f"خطأ من سيرفر الصوت: {response.text}")
+        return None
+
+# --- 4. اختيار موديل جماني تلقائياً (حل 404) ---
+def get_model():
     try:
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         for m in models:
             if '1.5-flash' in m: return m
-        return models[0] if models else "gemini-pro"
+        return models[0]
     except: return "gemini-pro"
 
-# --- 4. الواجهة ---
+# --- 5. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
@@ -60,42 +72,34 @@ if uploaded_file:
         st.success("الملف جاهز!")
         col1, col2, col3 = st.columns(3)
         
-        prompt_task = ""
+        task = ""
         if col1.button("🇸🇦 سولفها بالعربي"):
-            prompt_task = f"اشرحي المحتوى بلهجة نجدية سوالف بنات بين سارة ونورة: {full_text[:6000]}"
+            task = f"اشرحي المحتوى بلهجة نجدية سوالف بنات بين سارة ونورة: {full_text[:6000]}"
         if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            prompt_task = f"ترجمي واشرحي بلهجة نجدية سوالف بين سارة ونورة: {full_text[:6000]}"
+            task = f"ترجمي واشرحي بلهجة نجدية سوالف بين سارة ونورة: {full_text[:6000]}"
         if col3.button("🇬🇧 English"):
-            prompt_task = f"Explain this in English dialogue between Sarah and Nora: {full_text[:6000]}"
+            task = f"Explain this in English dialogue between Sarah and Nora: {full_text[:6000]}"
 
-        if prompt_task:
-            with st.spinner("جاري تجهيز السوالف صوتياً... 🎧"):
+        if task:
+            with st.spinner("جاري تجهيز السوالف... 🎧"):
                 try:
-                    model = genai.GenerativeModel(get_working_model())
+                    model = genai.GenerativeModel(get_model())
                     response = model.generate_content([
                         "أنتِ سارة ونورة. التنسيق: سارة: [نص] نورة: [نص]. اكتفي بـ 3 تبادلات.",
-                        prompt_task
+                        task
                     ])
                     
                     lines = [l.strip() for l in response.text.split('\n') if ':' in l]
                     
                     for line in lines:
-                        try:
-                            name, text = line.split(':', 1)
-                            vid = VOICE_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_2
-                            
-                            # محاولة توليد الصوت بكل الطرق الممكنة للمكتبة
-                            try:
-                                # الطريقة 1 (الجديدة)
-                                audio_gen = client.generate(text=text.strip(), voice=vid, model="eleven_multilingual_v2")
-                                audio_bytes = b"".join(list(audio_gen))
-                            except:
-                                # الطريقة 2 (القديمة)
-                                audio_bytes = elevenlabs.generate(text=text.strip(), voice=vid, model="eleven_multilingual_v2")
-                            
-                            st.audio(audio_bytes, format="audio/mp3")
-                        except Exception as inner_e:
-                            st.error(f"خطأ في توليد الصوت: {inner_e}")
+                        name, text = line.split(':', 1)
+                        # اختيار الصوت
+                        vid = VOICE_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_2
+                        
+                        # توليد الصوت بالطريقة المباشرة
+                        audio_data = text_to_speech_direct(text.strip(), vid)
+                        if audio_data:
+                            st.audio(audio_data, format="audio/mp3")
                             
                     st.info("اسمعي السالفة بالترتيب ✨")
                 except Exception as e:
