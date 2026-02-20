@@ -3,7 +3,7 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import requests
 
-# --- 1. الإعدادات والستايل (نفس واجهتك المفضلة) ---
+# --- 1. الواجهة الأصلية ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸")
 st.markdown("""
     <style>
@@ -17,41 +17,37 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. تهيئة المفاتيح واختيار الموديل المتاح تلقائياً ---
+# --- 2. التهيئة ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
-    
-    # كود ذكي للبحث عن الموديل المتاح في حسابك لتجنب خطأ "Not Found"
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    # نفضل 1.5-flash، إذا لم يوجد نأخذ أول موديل متاح
     WORKING_MODEL = next((m for m in available_models if "1.5-flash" in m), available_models[0])
 except Exception as e:
-    st.error(f"⚠️ خطأ في التهيئة: {e}")
+    st.error(f"⚠️ خطأ: {e}")
     st.stop()
 
-# المعرفات الخاصة بك
 VOICE_ID_1 = "qi4PkV9c01kb869Vh7Su" # سارة
 VOICE_ID_2 = "a1KZUXKFVFDOb33I1uqr" # نورة
 
-# --- 3. دالة تحويل النص لصوت (بجودة Turbo v2.5) ---
+# --- 3. دالة الصوت (إعدادات "النبرة المتغيرة") ---
 def get_audio_clip(text, voice_id):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY}
     data = {
         "text": text,
-        "model_id": "eleven_turbo_v2_5",
+        "model_id": "eleven_multilingual_v2", # أفضل للنبرة السعودية من التربو
         "voice_settings": {
-            "stability": 0.25,
-            "similarity_boost": 0.8, 
-            "style": 1.0,
+            "stability": 0.25,      # منخفض جداً عشان الصوت "يفصل" ويتحمس
+            "similarity_boost": 0.75, 
+            "style": 1.0,           # أعلى درجات التعبير
             "use_speaker_boost": True
         }
     }
     response = requests.post(url, json=data, headers=headers)
     return response.content if response.status_code == 200 else None
 
-# --- 4. واجهة المستخدم (النسخة الأصلية) ---
+# --- 4. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
 
@@ -65,38 +61,6 @@ if file:
         
         task_prompt = ""
         if col1.button("🇸🇦 سولفها بالعربي"):
-            task_prompt = "اشرحي ولخصي المحتوى ديب دايف بلهجة نجدية عفوية جداً (سارة ونورة). استخدمي كلمات حشو (اممم، تخيلي، وش ذاا، الزبدة)."
+            task_prompt = "سوالف بنات نجدية 'تمونون على بعض'. اشرحي بأسلوب ديب دايف بس بجمل قصيرة جداً ومقاطعات. استخدمي: (يووه، تخيلي، من جد، طيب، اسمعي، اممم، لحظة)."
         if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            task_prompt = "ترجمي المحتوى ولخصيه ديب دايف بلهجة نجدية عفوية (سارة ونورة). حولي المصطلحات الصعبة لأمثلة شعبية."
-        if col3.button("🇬🇧 English"):
-            task_prompt = "Deep dive explanation in a natural, fast-paced English dialogue between Sarah and Nora."
-
-        if task_prompt:
-            with st.spinner("جاري تحضير السالفة... 🎧"):
-                try:
-                    # استخدام الموديل الذي تم اختياره تلقائياً
-                    model = genai.GenerativeModel(WORKING_MODEL)
-                    res = model.generate_content([
-                        f"أنتِ سارة ونورة. حولي النص التالي لسوالف بشرية جداً (Deep Dive). التنسيق: سارة: [نص] نورة: [نص]. المحتوى: {full_text[:7000]}",
-                        task_prompt,
-                        "اجعلي الحوار 8 تبادلات، وأضيفي تمديد للحروف وضحكات (ههههه) وكلمات عفوية."
-                    ])
-                    
-                    lines = [l for l in res.text.split('\n') if ':' in l]
-                    all_audio = b"" 
-                    
-                    for line in lines:
-                        try:
-                            name, speech = line.split(':', 1)
-                            vid = VOICE_ID_1 if "سارة" in name or "Sarah" in name else VOICE_ID_2
-                            audio_clip = get_audio_clip(speech.strip() + "... ", vid)
-                            if audio_clip:
-                                all_audio += audio_clip
-                        except: continue
-
-                    if all_audio:
-                        st.markdown("---")
-                        st.audio(all_audio, format="audio/mp3")
-                        st.balloons()
-                except Exception as e:
-                    st.error(f"حدث خطأ: {e}")
+            task
