@@ -3,8 +3,8 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import requests
 
-# --- 1. إعدادات الصفحة ---
-st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸", layout="centered")
+# --- 1. الإعدادات ---
+st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸")
 
 st.markdown("""
     <style>
@@ -14,7 +14,7 @@ st.markdown("""
         width: 100%; border-radius: 25px; height: 3.5em;
         background-color: #8A1538; color: white; border: none; font-weight: bold;
     }
-    h1 { color: #8A1538; text-align: center; }
+    h1 { color: #8A1538; text-align: center; font-family: 'Tajawal'; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -24,30 +24,11 @@ try:
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
     genai.configure(api_key=GEMINI_KEY)
 except Exception as e:
-    st.error("⚠️ تأكدي من إعداد API Keys في Secrets (Gemini و ElevenLabs)")
+    st.error("⚠️ تأكدي من إعداد مفاتيح API في Secrets")
     st.stop()
 
-# --- 3. دالة لجلب الأصوات المجانية المتاحة في حسابك تلقائياً ---
-def get_available_voices():
-    url = "https://api.elevenlabs.io/v1/voices"
-    headers = {"xi-api-key": ELEVEN_KEY}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        voices = response.json().get('voices', [])
-        # تصفية الأصوات لاختيار الأصوات الأساسية (Premade) فقط لتجنب خطأ الدفع
-        premade_voices = [v['voice_id'] for v in voices if v.get('category') == 'premade']
-        if len(premade_voices) >= 2:
-            return premade_voices[0], premade_voices[1]
-        elif len(premade_voices) == 1:
-            return premade_voices[0], premade_voices[0]
-        else:
-            # إذا لم يجد أصوات بريميد، يأخذ أول أصوات متاحة
-            all_ids = [v['voice_id'] for v in voices]
-            return all_ids[0], all_ids[1]
-    return None, None
-
-# --- 4. دالة تحويل النص لصوت ---
-def text_to_speech_direct(text, voice_id):
+# --- 3. دالة تحويل النص لصوت مع كاشف أخطاء دقيق ---
+def text_to_speech(text, voice_id, line_index):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {
         "Accept": "audio/mpeg",
@@ -59,21 +40,17 @@ def text_to_speech_direct(text, voice_id):
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {"stability": 0.5, "similarity_boost": 0.5}
     }
+    
     response = requests.post(url, json=data, headers=headers)
+    
     if response.status_code == 200:
         return response.content
-    return None
+    else:
+        # إذا فشل الصوت، سنعرض الخطأ لنعرف السبب
+        st.error(f"فشل تشغيل المقطع {line_index}: {response.text}")
+        return None
 
-# --- 5. اختيار موديل جماني ---
-def get_model():
-    try:
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        for m in models:
-            if '1.5-flash' in m: return m
-        return models[0]
-    except: return "gemini-pro"
-
-# --- 6. الواجهة ---
+# --- 4. الواجهة ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
@@ -95,31 +72,36 @@ if uploaded_file:
             task = f"Explain this in English dialogue between Sarah and Nora: {full_text[:6000]}"
 
         if task:
-            with st.spinner("جاري تجهيز السوالف... 🎧"):
-                # جلب الأصوات المسموحة تلقائياً
-                v1, v2 = get_available_voices()
-                if not v1:
-                    st.error("لم نتمكن من العثور على أصوات متاحة في حسابك.")
-                    st.stop()
-                
+            with st.spinner("جاري تجهيز السوالف صوتياً... 🎧"):
                 try:
-                    model = genai.GenerativeModel(get_model())
+                    # محاولة استخدام أكثر من اسم للموديل لضمان العمل
+                    model_name = 'gemini-1.5-flash'
+                    model = genai.GenerativeModel(model_name)
+                    
                     response = model.generate_content([
-                        "أنتِ سارة ونورة. التنسيق: سارة: [نص] نورة: [نص]. اكتفي بـ 3 تبادلات.",
+                        "You are Sarah and Nora. Format: Sarah: [text] Nora: [text]. Max 3 exchanges.",
                         task
                     ])
                     
                     lines = [l.strip() for l in response.text.split('\n') if ':' in l]
                     
-                    for line in lines:
+                    # IDs أصوات أساسية (Rachel و Bella)
+                    # إذا استمر الخطأ، سنعرف من رسالة الخطأ التي ستظهر
+                    V1 = "21m0pTQbwHOo96WRhcpx" 
+                    V2 = "EXAVITQu4vr4xnNLTSrf"
+
+                    audio_success = False
+                    for i, line in enumerate(lines, 1):
                         name, text = line.split(':', 1)
-                        # استخدام الصوت الأول لسارة والثاني لنورة تلقائياً
-                        current_vid = v1 if any(n in name.lower() for n in ["سارة", "sarah"]) else v2
+                        current_vid = V1 if "sarah" in name.lower() or "سارة" in name else V2
                         
-                        audio_data = text_to_speech_direct(text.strip(), current_vid)
+                        audio_data = text_to_speech(text.strip(), current_vid, i)
                         if audio_data:
                             st.audio(audio_data, format="audio/mp3")
-                            
-                    st.info("اسمعي السالفة بالترتيب ✨")
+                            audio_success = True
+                    
+                    if audio_success:
+                        st.info("اسمعي السالفة بالترتيب ✨")
+                        
                 except Exception as e:
-                    st.error(f"حدث خطأ: {e}")
+                    st.error(f"حدث خطأ في النظام: {e}")
