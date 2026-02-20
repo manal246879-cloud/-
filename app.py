@@ -3,7 +3,7 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import requests
 
-# --- 1. الواجهة الأصلية (بدون أي تغيير) ---
+# --- 1. الواجهة الأصلية (ممنوع التغيير) ---
 st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸")
 st.markdown("""
     <style>
@@ -17,21 +17,21 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. تهيئة المفاتيح واختيار الموديل ---
+# --- 2. تهيئة المفاتيح (استخدام موديل Flash لتجنب القوتا) ---
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
-    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    WORKING_MODEL = next((m for m in available_models if "1.5-flash" in m or "pro" in m), available_models[0])
+    # نستخدم Flash حصراً لأنه أسرع وحدوده أعلى بكثير من Pro
+    WORKING_MODEL = "gemini-1.5-flash"
 except Exception as e:
-    st.error(f"⚠️ خطأ في الإعدادات: {e}")
+    st.error("⚠️ تأكدي من المفاتيح في Secrets")
     st.stop()
 
 # المعرفات الخاصة بك (سارة ونورة)
 VOICE_ID_1 = "qi4PkV9c01kb869Vh7Su" # سارة
 VOICE_ID_2 = "a1KZUXKFVFDOb33I1uqr" # نورة
 
-# --- 3. دالة الصوت (إعدادات النبرة البشرية العفوية) ---
+# --- 3. دالة الصوت (إعدادات NotebookLM: سريعة وعفوية) ---
 def get_audio_clip(text, voice_id):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY}
@@ -39,9 +39,9 @@ def get_audio_clip(text, voice_id):
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.25,      # منخفض جداً لكسر الروبوتية وإضافة حماس
+            "stability": 0.3,           # تقليل الثبات لإضافة "روح" وعفوية
             "similarity_boost": 0.8, 
-            "style": 1.0,           # أداء تعبيري بشري عالي
+            "style": 0.9,               # مبالغة في الأداء التعبيري
             "use_speaker_boost": True
         }
     }
@@ -61,26 +61,27 @@ if file:
         col1, col2, col3 = st.columns(3)
         
         task_prompt = ""
-        # الزر الأول: عربي لعربي
+        # الزر الأول: عربي
         if col1.button("🇸🇦 سولفها بالعربي"):
-            task_prompt = "اشرحي المحتوى ديب دايف بلهجة نجدية عفوية جداً (سارة ونورة). استخدمي جمل قصيرة وحشو بشري (اممم، يووه، تخيلي، لحظة)."
+            task_prompt = "اشرحي ولخصي المحتوى 'Deep Dive' بلهجة نجدية عفوية جداً. سارة ونورة يمونون على بعض."
         
-        # الزر الثاني: انجليزي لعربي (عربناها لك)
+        # الزر الثاني: عربناها لك
         if col2.button("🇺🇸➡️🇸🇦 عربناها لك"):
-            task_prompt = "ترجمي المحتوى ولخصيه ديب دايف بلهجة نجدية عفوية (سارة ونورة). استخدمي جمل قصيرة وحشو بشري (من جد، اسمعي، يعني)."
+            task_prompt = "ترجمي ولخصي المحتوى 'Deep Dive' بلهجة نجدية عفوية (سارة ونورة). حولي الكلام لأمثلة واقعية."
         
-        # الزر الثالث: انجليزي لانجليزي
+        # الزر الثالث: English
         if col3.button("🇬🇧 English"):
-            task_prompt = "Deep dive explanation in a natural, fast-paced English dialogue between Sarah and Nora. Use fillers like (Wait, wow, imagine, like)."
+            task_prompt = "Deep dive explanation in a natural, fast-paced English dialogue between Sarah and Nora."
 
         if task_prompt:
-            with st.spinner("جاري تحضير السالفة بنبرة بشرية... 🎧"):
+            with st.spinner("سارة ونورة يجهزون السالفة... 🎧"):
                 try:
                     model = genai.GenerativeModel(WORKING_MODEL)
+                    # برومبت صارم لكسر الروبوتية (جمل قصيرة + حشو بشري)
                     res = model.generate_content([
-                        f"أنتِ سارة ونورة. حولي النص التالي لسوالف بشرية عفوية جداً. التنسيق: سارة: [نص] نورة: [نص]. المحتوى: {full_text[:7000]}",
+                        f"أنتِ سارة ونورة. حولي النص التالي لسوالف بشرية عفوية (Deep Dive). التنسيق: سارة: [نص] نورة: [نص]. المحتوى: {full_text[:7000]}",
                         task_prompt,
-                        "مهم: اجعلي الجمل قصيرة جداً (Punchy) وأضيفي ضحكات ومقاطعات لكسر الروبوتية."
+                        "مهم جداً: اجعلي الجمل قصيرة جداً (أقل من 7 كلمات للجملة). استخدمي كلمات حشو (اممم، ياخي، تخيلي، لحظة، هههه، من جد). لا تشرحي ببرود!"
                     ])
                     
                     lines = [l for l in res.text.split('\n') if ':' in l]
@@ -90,12 +91,11 @@ if file:
                         try:
                             name, speech = line.split(':', 1)
                             vid = VOICE_ID_1 if any(n in name.lower() for n in ["سارة", "sarah"]) else VOICE_ID_2
-                            # تحويل النص لصوت مع إضافة وقفة بسيطة
+                            # إضافة وقفة تنفسية خفيفة جداً
                             audio_clip = get_audio_clip(speech.strip() + "... ", vid)
                             if audio_clip:
                                 all_audio += audio_clip
-                        except:
-                            continue
+                        except: continue
 
                     if all_audio:
                         st.markdown("---")
@@ -103,4 +103,7 @@ if file:
                         st.balloons()
                         
                 except Exception as e:
-                    st.error(f"حدث خطأ: {e}")
+                    if "429" in str(e):
+                        st.error("⚠️ جوجل مشغول حالياً، انتظري 10 ثواني واضغطي الزر مرة ثانية.")
+                    else:
+                        st.error(f"حدث خطأ: {e}")
