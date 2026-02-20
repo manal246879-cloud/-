@@ -65,7 +65,7 @@ if uploaded_file:
 
             if final_prompt:
                 with st.spinner("قاعدين نضبط لك السالفة... ☕"):
-                    # التعديل الوحيد هنا: إضافة كلمة latest لحل خطأ الـ 404
+                    # التعديل لحل مشكلة الـ 404
                     model = genai.GenerativeModel('gemini-1.5-flash-latest')
                     response = model.generate_content(final_prompt)
                     
