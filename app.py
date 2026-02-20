@@ -24,7 +24,7 @@ st.markdown("""
 
 # دالة لتوليد الصوت الطبيعي
 async def generate_natural_audio(text, output_file):
-    # نستخدم صوت "Zariyah" وهو صوت سعودي نسائي طبيعي جداً
+    # صوت "Zariyah" سعودي نسائي طبيعي
     voice = "ar-SA-ZariyahNeural"
     communicate = edge_tts.Communicate(text, voice, rate="+10%") 
     await communicate.save(output_file)
@@ -65,16 +65,23 @@ if uploaded_file:
         if final_prompt:
             with st.spinner("نورة ومنال قاعدين يجهزون السوالف... لحظات ✨"):
                 try:
-                    # توليد الحوار من Gemini
+                    # --- ربط المفتاح من السيكرتس ---
+                    if "GEMINI_API_KEY" in st.secrets:
+                        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    else:
+                        st.error("المفتاح غير موجود في Secrets!")
+                        st.stop()
+
+                    # 1. توليد الحوار من Gemini
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     response = model.generate_content(final_prompt)
                     generated_script = response.text
 
-                    # تحويل الحوار لصوت طبيعي
+                    # 2. تحويل الحوار لصوت طبيعي
                     audio_file = "faza_audio.mp3"
                     asyncio.run(generate_natural_audio(generated_script, audio_file))
                     
-                    # عرض النتيجة (صوت فقط)
+                    # 3. عرض النتيجة
                     st.markdown("---")
                     st.markdown("### 🎧 جاهز! اسمعي الفزعة:")
                     st.audio(audio_file)
