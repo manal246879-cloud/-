@@ -22,18 +22,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. إعداد الـ API ---
-API_KEY = "AIzaSyAB-c1_jgZ_yBoPLYAvttwx4W1DyjaVmVM" 
-genai.configure(api_key=API_KEY)
-
 # دالة لتوليد الصوت الطبيعي
 async def generate_natural_audio(text, output_file):
     # نستخدم صوت "Zariyah" وهو صوت سعودي نسائي طبيعي جداً
     voice = "ar-SA-ZariyahNeural"
-    communicate = edge_tts.Communicate(text, voice, rate="+10%") # تسريع بسيط ليكون حيوي أكثر
+    communicate = edge_tts.Communicate(text, voice, rate="+10%") 
     await communicate.save(output_file)
 
-# --- 3. واجهة المستخدم ---
+# --- 2. واجهة المستخدم ---
 st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>اسمعي شرح محاضرتك كأنها سوالف بين نورة ومنال</p>", unsafe_allow_html=True)
 
@@ -69,16 +65,16 @@ if uploaded_file:
         if final_prompt:
             with st.spinner("نورة ومنال قاعدين يجهزون السوالف... لحظات ✨"):
                 try:
-                    # 1. توليد الحوار من Gemini
+                    # توليد الحوار من Gemini
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     response = model.generate_content(final_prompt)
                     generated_script = response.text
 
-                    # 2. تحويل الحوار لصوت طبيعي (بدون عرض النص)
+                    # تحويل الحوار لصوت طبيعي
                     audio_file = "faza_audio.mp3"
                     asyncio.run(generate_natural_audio(generated_script, audio_file))
                     
-                    # 3. عرض النتيجة (صوت فقط)
+                    # عرض النتيجة (صوت فقط)
                     st.markdown("---")
                     st.markdown("### 🎧 جاهز! اسمعي الفزعة:")
                     st.audio(audio_file)
