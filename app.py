@@ -3,19 +3,8 @@ import google.generativeai as genai
 from pypdf import PdfReader
 import requests
 
-# --- 1. إعدادات الصفحة ---
-st.set_page_config(page_title="فزعة، تسولفها", page_icon="🌸")
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Tajawal', sans-serif; direction: rtl; text-align: right; }
-    .stButton>button {
-        width: 100%; border-radius: 25px; height: 3.5em;
-        background-color: #8A1538; color: white; border: none; font-weight: bold;
-    }
-    h1 { color: #8A1538; text-align: center; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- 1. الإعدادات ---
+st.set_page_config(page_title="فزعة - Deep Dive", page_icon="🌸")
 
 # --- 2. تهيئة المفاتيح ---
 try:
@@ -27,21 +16,20 @@ except:
     st.error("⚠️ تأكدي من المفاتيح في Secrets")
     st.stop()
 
-# المعرفات الخاصة بك
 VOICE_ID_1 = "qi4PkV9c01kb869Vh7Su" # سارة
 VOICE_ID_2 = "a1KZUXKFVFDOb33I1uqr" # نورة
 
-# --- 3. دالة تحويل النص لصوت (إعدادات الحماس والسرعة) ---
+# --- 3. دالة تحويل النص لصوت (إعدادات Turbo v2.5 البشرية) ---
 def get_audio_clip(text, voice_id):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY}
     data = {
         "text": text,
-        "model_id": "eleven_multilingual_v2",
+        "model_id": "eleven_turbo_v2_5", # تم التغيير لأحدث وأسرع موديل بشري
         "voice_settings": {
-            "stability": 0.3,           # نبرة متغيرة وحماسية
+            "stability": 0.20,           # منخفض جداً لإعطاء عفوية قصوى ومنع الرتابة
             "similarity_boost": 0.8, 
-            "style": 0.85,              # مبالغة في الأسلوب البشري
+            "style": 1.0,               # أقصى درجة من الأداء التعبيري
             "use_speaker_boost": True
         }
     }
@@ -49,44 +37,45 @@ def get_audio_clip(text, voice_id):
     return response.content if response.status_code == 200 else None
 
 # --- 4. واجهة المستخدم ---
-st.markdown("<h1>🌸 فزعة، تسولفها</h1>", unsafe_allow_html=True)
-file = st.file_uploader("ارفعي ملف المحاضرة (PDF)", type="pdf")
+st.markdown("<h1 style='text-align: center; color: #8A1538;'>🌸 Deep Dive: سارة ونورة</h1>", unsafe_allow_html=True)
+file = st.file_uploader("ارفعي المحاضرة (PDF)", type="pdf")
 
 if file:
     reader = PdfReader(file)
     full_text = "".join([p.extract_text() for p in reader.pages[:10] if p.extract_text()])
     
     if full_text.strip():
-        st.success("الملف جاهز! سارة ونورة بيلخصون لك الزبدة:")
-        col1, col2, col3 = st.columns(3)
-        
-        prompt_type = ""
-        if col1.button("🇸🇦 لخصيها بالعربي"):
-            prompt_type = "لخصي أهم النقاط في المحاضرة بلهجة نجدية عفوية جداً. سارة ونورة يسولفون ويعطون الزبدة 'تخيلي وش طلع أهم شيء، اسمعي الزبدة، المختصر هو'."
-        if col2.button("🇺🇸➡️🇸🇦 ترجمة وتلخيص"):
-            prompt_type = "ترجمي ولخصي المحتوى بلهجة نجدية سريعة. سارة تعلم نورة أهم الأشياء اللي لازم تعرفها للاختبار."
-        if col3.button("🇬🇧 English Summary"):
-            prompt_type = "Summarize the key points in a fast, natural English girl-talk dialogue between Sarah and Nora."
-
-        if prompt_type:
-            with st.spinner("جاري تلخيص المحاضرة وتجهيز السالفة... 🎧"):
+        if st.button("🚀 ابدأ الديب دايف (نبرة بشرية)"):
+            with st.spinner("سارة ونورة يحللون المحاضرة... 🎧"):
                 try:
                     model = genai.GenerativeModel(WORKING_MODEL)
-                    # طلب التلخيص بوضوح
-                    res = model.generate_content([
-                        f"أنتِ سارة ونورة. لخصي أهم 5 نقاط في هذا النص بأسلوب سوالف بنات حماسي ومختصر جداً. التنسيق: سارة: [نص] نورة: [نص]. المحتوى: {full_text[:5000]}",
-                        "اجعلي الحوار سريع ولا يتجاوز 6 تبادلات. ركزي على 'الزبدة' فقط."
-                    ])
                     
+                    # برومبت متطور لإنتاج نص "قابل للغناء" بصوت بشري
+                    prompt = f"""
+                    أنتِ سارة ونورة. حولي النص التالي لحوار 'Deep Dive' بلهجة نجدية عفوية جداً.
+                    مهم جداً لكسر الروبوتية:
+                    1. اكتبي الكلمات كما تنطق (مثلاً: 'وش ذااا'، 'يا خييي'، 'تخيللللي').
+                    2. أضيفي تعبيرات صوتية مكتوبة: (ههههه، امممم، واو، يووه، لاااا).
+                    3. اجعلي الجمل قصيرة وسريعة وورا بعض، مع مقاطعات عفوية.
+                    4. ابدئي بصدمة وانتهي بالزبدة.
+                    
+                    المحتوى: {full_text[:6000]}
+                    
+                    التنسيق: سارة: [نص] نورة: [نص].
+                    """
+                    
+                    res = model.generate_content(prompt)
                     lines = [l for l in res.text.split('\n') if ':' in l]
+                    
                     all_audio = b"" 
                     
                     for line in lines:
                         try:
                             name, speech = line.split(':', 1)
                             vid = VOICE_ID_1 if "سارة" in name or "Sarah" in name else VOICE_ID_2
-                            # تحويل النص لصوت مع إضافة وقفة بسيطة
-                            audio_clip = get_audio_clip(speech.strip() + " ... ", vid)
+                            
+                            # إضافة وقفات زمنية (صمت) بين الجمل ليعطي إيحاء بالتفكير
+                            audio_clip = get_audio_clip(speech.strip() + "... ", vid)
                             if audio_clip:
                                 all_audio += audio_clip
                         except:
@@ -94,9 +83,7 @@ if file:
 
                     if all_audio:
                         st.markdown("---")
-                        st.markdown("### 🎧 استمعي للملخص كامل:")
                         st.audio(all_audio, format="audio/mp3")
-                        st.balloons()
-                        
+                        st.success("تم التوليد بموديل Turbo v2.5")
                 except Exception as e:
                     st.error(f"حدث خطأ: {e}")
