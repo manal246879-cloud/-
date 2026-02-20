@@ -14,7 +14,7 @@ try:
     VOICE_1 = st.secrets["VOICE_ID_1"]
     VOICE_2 = st.secrets["VOICE_ID_2"]
 except Exception:
-    st.error("⚠️ تأكدي من إضافة كل المفاتيح (GEMINI_API_KEY, ELEVENLABS_API_KEY, VOICE_ID_1, VOICE_ID_2) في Secrets")
+    st.error("⚠️ تأكدي من إضافة كل المفاتيح في Secrets (GEMINI_API_KEY, ELEVENLABS_API_KEY, VOICE_ID_1, VOICE_ID_2)")
     st.stop()
 
 # تهيئة الأدوات
@@ -44,39 +44,40 @@ if uploaded_file:
         if st.button("🎙️ ابدئي السوالف (نجدي طبيعي)"):
             with st.spinner("سارة ونورة يجهزون القهوة وبيسولفون لك... ☕"):
                 
-                prompt = f"""
-                المحتوى: {full_text[:3000]}
-                المطلوب: حوار ممتع بين بنتين (سارة ونورة) بلهجة نجدية بيضاء يشرحون المحتوى.
-                سارة: [النص]
-                نورة: [النص]
-                (اكتفي بـ 3 تبادلات فقط).
-                """
+                prompt = f"المحتوى: {full_text[:3000]}\nالمطلوب: حوار ممتع بين بنتين (سارة ونورة) بلهجة نجدية بيضاء يشرحون المحتوى.\nسارة: [النص]\nنورة: [النص]\n(اكتفي بـ 3 تبادلات فقط)."
                 
-                try:
-                    # التعديل هنا: جربنا اسم الموديل الأكثر استقراراً
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(prompt)
-                    script = response.text
-                except Exception:
-                    # خطة بديلة إذا فشل الموديل الأول
-                    model = genai.GenerativeModel('gemini-pro')
-                    response = model.generate_content(prompt)
-                    script = response.text
+                script = ""
+                # قائمة بأسماء الموديلات الممكنة لتجنب خطأ 404
+                model_names = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'models/gemini-1.5-flash', 'gemini-pro']
                 
+                for m_name in model_names:
+                    try:
+                        model = genai.GenerativeModel(m_name)
+                        response = model.generate_content(prompt)
+                        script = response.text
+                        if script: break # إذا نجح، اخرج من الحلقة
+                    except Exception:
+                        continue # إذا فشل، جرب الاسم اللي بعده
+                
+                if not script:
+                    st.error("عجزنا نتصل بالذكاء الاصطناعي، تأكدي من مفتاح الـ API")
+                    st.stop()
+
                 lines = [line for line in script.strip().split('\n') if ':' in line]
                 
                 for line in lines:
-                    name, text = line.split(':', 1)
-                    voice_id = VOICE_1 if "سارة" in name else VOICE_2
-                    
-                    st.markdown(f"<div class='chat-box'><b>{name}:</b> {text}</div>", unsafe_allow_html=True)
-                    
                     try:
+                        name, text = line.split(':', 1)
+                        voice_id = VOICE_1 if "سارة" in name else VOICE_2
+                        
+                        st.markdown(f"<div class='chat-box'><b>{name}:</b> {text}</div>", unsafe_allow_html=True)
+                        
+                        # توليد الصوت
                         audio = client.generate(text=text, voice=voice_id, model="eleven_multilingual_v2")
                         audio_bytes = b"".join(list(audio))
                         st.audio(audio_bytes, format="audio/mp3")
                     except Exception as e:
-                        st.warning(f"مشكلة في توليد الصوت لـ {name}: {e}")
+                        st.warning(f"مشكلة بسيطة: {e}")
 
     else:
         st.error("المعذرة، الملف ما فيه نص نقدر نقراه.")
