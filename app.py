@@ -22,8 +22,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. إعداد الـ API بشكل آمن ---
-# ملاحظة: تم حذف المفتاح. يفضل وضعه في Secrets الخاصة بـ Streamlit 
-# أو استخدامه كمتغير بيئة.
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "") 
 
 if not GEMINI_API_KEY:
@@ -49,9 +47,8 @@ if uploaded_file:
             st.success("الملف جاهز! وش تبين نسوي؟")
             col1, col2, col3 = st.columns(3)
             final_prompt = ""
-            lang_code = 'ar' # الافتراضي عربي
+            lang_code = 'ar' 
 
-            # الشخصية النجدية الودودة
             system_behavior = "أنتِ خبيرة أكاديمية بأسلوب 'سوالف نجدية' بيضاء ولطيفة. اشرحي بعمق وتبسيط مستخدمة الإيموجيات ✨."
 
             if col1.button("🇸🇦 سولفها بالعربي"):
@@ -68,14 +65,13 @@ if uploaded_file:
 
             if final_prompt:
                 with st.spinner("قاعدين نضبط لك السالفة... ☕"):
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # التعديل الوحيد هنا: إضافة كلمة latest لحل خطأ الـ 404
+                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
                     response = model.generate_content(final_prompt)
                     
-                    # تنظيف النص وتجهيزه للصوت
                     clean_text = response.text.replace("*", "").replace("#", "").strip()
                     
                     if clean_text:
-                        # تحويل النص لصوت (لأول 1000 حرف لضمان السرعة)
                         try:
                             tts = gTTS(text=clean_text[:1000], lang=lang_code)
                             tts.save("voice.mp3")
@@ -84,7 +80,6 @@ if uploaded_file:
                             st.markdown("### 🎧 اسمعي السالفة هنا:")
                             st.audio("voice.mp3")
                             
-                            # تم حذف st.write(response.text) ليكون التركيز على الصوت فقط بناءً على طلبك
                             st.info("اضغطي على زر التشغيل أعلاه لسماع الشرح ✨")
                         except Exception as e:
                             st.error(f"عجزنا نطلع الصوت، بس هذا الشرح مكتوب: \n\n {response.text}")
